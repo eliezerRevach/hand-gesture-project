@@ -1,8 +1,3 @@
-# Copyright 2014-2017 Bert Carremans
-# Author: Bert Carremans <bertcarremans.be>
-#
-# License: BSD 3 clause
-
 
 import os
 import random
@@ -12,22 +7,22 @@ from shutil import copyfile
 folder_input="test_movement"
 output_folder='test_movement_train_test'
 percent=0.8
-def img_train_test_split(img_source_dir, train_size):
+def img_train_test_split(file_source_dir, train_size):
     """
     Randomly splits images over a train and validation folder, while preserving the folder structure
 
     Parameters
     ----------
-    img_source_dir : string
+    file_source_dir : string
         Path to the folder with the images to be split. Can be absolute or relative path   
 
     train_size : float
         Proportion of the original images that need to be copied in the subdirectory in the train folder
     """
-    if not (isinstance(img_source_dir, str)):
+    if not (isinstance(file_source_dir, str)):
         raise AttributeError('img_source_dir must be a string')
 
-    if not os.path.exists(img_source_dir):
+    if not os.path.exists(file_source_dir):
         raise OSError('img_source_dir does not exist')
 
     if not (isinstance(train_size, float)):
@@ -42,11 +37,11 @@ def img_train_test_split(img_source_dir, train_size):
         if not os.path.exists(output_folder+'/validation'):
             os.makedirs(output_folder+'/validation')
 
-    # Get the subdirectories in the main image folder
-    subdirs = [subdir for subdir in os.listdir(img_source_dir) if os.path.isdir(os.path.join(img_source_dir, subdir))]
+    # Get the subdirectories in the main file folder
+    subdirs = [subdir for subdir in os.listdir(file_source_dir) if os.path.isdir(os.path.join(img_source_dir, subdir))]
 
     for subdir in subdirs:
-        subdir_fullpath = os.path.join(img_source_dir, subdir)
+        subdir_fullpath = os.path.join(file_source_dir, subdir)
         if len(os.listdir(subdir_fullpath)) == 0:
             print(subdir_fullpath + ' is empty')
             break
@@ -64,7 +59,7 @@ def img_train_test_split(img_source_dir, train_size):
         train_counter = 0
         validation_counter = 0
 
-        # Randomly assign an image to train or validation folder
+        # Randomly assign an file to train or validation folder
         for filename in os.listdir(subdir_fullpath):
             if filename.endswith(".jpg") or filename.endswith(".png") or filename.endswith(".csv") or filename.endswith(".txt"):
                 fileparts = filename.split('.')
@@ -80,4 +75,7 @@ def img_train_test_split(img_source_dir, train_size):
 
         print('Copied ' + str(train_counter) + ' images to data/train/' + subdir)
         print('Copied ' + str(validation_counter) + ' images to data/validation/' + subdir)
+
+
+
 img_train_test_split(folder_input+"/", percent)

@@ -55,16 +55,15 @@ def openbci_stream(sample_size,output, channel_from, channel_to, resizeTo):
 def main():
 
     #params:
-    sample_size=200
+    sample_size=256
     output_path="rock_paper_scissor_430size_RMS_CSV/0/"
     channel_from=2
     channel_to=4
-    resizeTo=256
     #-----------------------#
 
     isExist = os.path.exists(output_path)
     if not isExist:
         os.makedirs(output_path)
-    openbci_stream(sample_size,output_path, channel_from, channel_to, resizeTo)
+    openbci_stream(sample_size,output_path, channel_from, channel_to, sample_size)
 
 main()

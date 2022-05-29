@@ -1,15 +1,14 @@
-#params
+#imports
 import os
 import random
 
 import numpy as np
 from matplotlib import pyplot as plt
 
+#-------params
 normalize=True
-
 do_rms=True
 do_histogram=True
-
 Class_output_name="movement"
 max_power_file="free_records/for_mvc.txt"
 path="rock_paper_scissor_380size_csv" # input
@@ -18,14 +17,13 @@ deviation_right =0.25
 deviation_left =0.5
 reuse_sample=5
 move_central_by_std= -0.75#move the center left or right depend on the std before doing random deviation
-
 window_size=50# ms
+complete_to_final=256
 
 
-add_zeros=True
+
 #----#
 complete_to_in_rms=512*2
-complete_to_final=256
 #----#
 
 
@@ -107,10 +105,6 @@ def histogramTwoD(Array2d_result):
     pass
 
 
-folders = os.listdir(path)
-MVC=None
-if normalize:
-    MVC = get_mvc(max_power_file)
 
 
 def cut_sample(Array2d_result, mean_arr, deviation_right,deviation_left,complete_to_final):
@@ -128,8 +122,15 @@ def cut_sample(Array2d_result, mean_arr, deviation_right,deviation_left,complete
         re_array=np.vstack([re_array,arr])
     return re_array[len(Array2d_result):]
     pass
-    pass
 
+
+
+
+
+folders = os.listdir(path)
+MVC=None
+if normalize:
+    MVC = get_mvc(max_power_file)
 
 for Class in folders:
 
