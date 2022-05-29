@@ -2,7 +2,7 @@ import math
 
 import numpy as np
 import matplotlib.pyplot as plt
-path="SAME_AS_PROJECT_CSV" # input
+path="old_dir/SAME_AS_PROJECT_CSV" # input
 Class="1"
 File="20.csv"
 mean_size=30
