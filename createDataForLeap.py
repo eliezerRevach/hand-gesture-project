@@ -2,7 +2,7 @@ import asyncio
 import threading
 from lib2to3.pgen2 import driver
 
-from cffi.cparser import lock
+
 from websockets import connect
 import time
 import json

@@ -2,6 +2,8 @@
 
 #-----------------------------------------------imports------------------------------------------------#
 import asyncio
+import os
+
 from websockets import connect
 import json
 import threading
@@ -125,19 +127,27 @@ def variance(data,size,i):
 
 
 def studyMovement(dataList_classification, sizeOfGroup):#movement [0] no movement[1]
-    X_train, X_valid, y_train, y_valid = loadDataList(dataList_classification, sizeOfGroup,variance)
-    depth = 2
-    estimators = 50
-    alpha =0.003162277660168377
+    filename = 'model_movement.sav'
+    X_train, X_valid, y_train, y_valid = loadDataList(dataList_classification, sizeOfGroup, variance)
+    if not file_exists(filename):
+        print("creating movement model")
 
-    min_samples_leaf =2
-    min_samples_split =2
 
-    clf = RandomForestClassifier(max_depth=depth, n_estimators=estimators, ccp_alpha=alpha,
-                                 min_samples_leaf=min_samples_leaf, min_samples_split=min_samples_split,
-                                 random_state=20)
-    clf.fit(X_train, y_train)
+        depth = 19
+        estimators = 260
+        alpha =0.000001
 
+        min_samples_leaf =12
+        min_samples_split =12
+
+        clf = RandomForestClassifier(max_depth=depth, n_estimators=estimators, ccp_alpha=alpha,
+                                     min_samples_leaf=min_samples_leaf, min_samples_split=min_samples_split,
+                                     random_state=20)
+        clf.fit(X_train, y_train)
+        pickle.dump(clf, open(filename, 'wb'))
+    else:
+        print("loading movement model")
+        clf = pickle.load(open(filename, 'rb'))
     print("\n\nmovement detection succeeding rate with RandomForestClassifier:",
           str(compare(clf.predict(X_valid), y_valid) * 100) + "%")
 
@@ -146,21 +156,31 @@ def studyMovement(dataList_classification, sizeOfGroup):#movement [0] no movemen
 
     pass
 
-
+import pickle
+from os.path import exists as file_exists
 def studyHandGesture(dataList_movement):
-    X_train, X_valid, y_train, y_valid = loadDataList(dataList_movement, 1,BlockData)
-    depth = 3
-    estimators = 72
-    alpha =0.003162277660168377
+    filename = 'model_HandGesture.sav'
+    X_train, X_valid, y_train, y_valid = loadDataList(dataList_movement, 1, BlockData)
 
-    min_samples_leaf =2
-    min_samples_split =2
+    if not file_exists(filename):
+        print("creating handgesture model")
+        depth = 11
+        estimators = 160
+        alpha =0.001
 
-    clf = RandomForestClassifier(max_depth=depth, n_estimators=estimators, ccp_alpha=alpha,
-                                 min_samples_leaf=min_samples_leaf, min_samples_split=min_samples_split,
-                                 random_state=20)
-    clf.fit(X_train, y_train)
+        min_samples_leaf =4
+        min_samples_split =4
 
+        clf = RandomForestClassifier(max_depth=depth, n_estimators=estimators, ccp_alpha=alpha,
+                                     min_samples_leaf=min_samples_leaf, min_samples_split=min_samples_split,
+                                     random_state=20)
+        clf.fit(X_train, y_train)
+
+        pickle.dump(clf, open(filename, 'wb'))
+    else:
+        print("loading handgesture model")
+
+        clf=pickle.load(open(filename, 'rb'))
     print("\n\nclassification succeeding rate with RandomForestClassifier:",
           str(compare(clf.predict(X_valid), y_valid) * 100) + "%")
 
@@ -210,24 +230,57 @@ def dictToArray(data):
     return re
 
 
-def collectFromOpenBciBettwen(from_timestamp, to_timestamp):
-    data = np.loadtxt(open("newData/raw/data" + ".txt", 'rb'), delimiter=",")
+def collectFromOpenBciBettwen(from_timestamp, to_timestamp,offset_left=0,offset_right=0):
+    print("test:",from_timestamp)
+    data = np.loadtxt(open("openbci/raw/data" + ".txt", 'rb'), delimiter=",")
     # to get a bit of extra data  , by adding to the edges
     # correct_from_timestamp=
     # correct_to_timestamp=
-    return data[(data[:,0]>=from_timestamp) & (data[:,0]<=to_timestamp)]
+    index = np.nonzero((data[:,0]>=from_timestamp) & (data[:,0]<=to_timestamp))
+    print("index len:",len(index[0]))
+
+    print(index[0][0])
+    print(index[0][len(index[0]) - 1])
+    print(offset_left)
+    print(offset_right)
+    index_a = max(index[0][0] - offset_left,0)
+    index_b = min(index[0][len(index[0]) - 1] + offset_right,len(data)-1)
+    return data[index_a:index_b+1]
     pass
 
 
-async def createSampleBettwen(from_timestamp, to_timestamp, movementtype):
-    file = open("openbci/" + movementtype +"/data"+ ".txt", 'a+')
-    data=collectFromOpenBciBettwen(from_timestamp,to_timestamp)
+def createSampleBettwen(from_timestamp, to_timestamp, movementtype,symbol,offset_left=0,offset_right=0,foldering_by_last=False,last=None):
+    path = "openbci/" + str(movementtype[0]) + "/"
+    if foldering_by_last:
+        path = "openbci/with_last/"+str(last)+"/"+ str(movementtype[0])+"/"
+    if not os.path.exists(path):
+        os.makedirs(path)
+    file = open(path + "data" +symbol + ".txt", 'a+')
+    from_=from_timestamp
+    to_=  to_timestamp
+    print("test",offset_left)
+    data=collectFromOpenBciBettwen(from_,to_,offset_left=offset_left,offset_right=offset_right)
+    import sys
 
-    file.write(data+'\n')
+    np.set_printoptions(threshold=sys.maxsize)
+    print("data len:",len(data))
+    #cleaning the data for a string to write in file leaveing only the samples without the timestamps
+    to_send=np.array2string(data[:, 1:].flatten(), separator=',').replace("[", "").replace("]", "").replace(" ", "").replace("\n", "")
+    file.write(to_send+'\n')
 
 
     pass
-
+def cleanDataUpTo(timestamp):#remove the data from data up to timestamp to avoid files to heavy
+    lock.acquire()
+    file = open("openbci/raw/data" + ".txt", 'a+')
+    data = np.loadtxt(open("openbci/raw/data" + ".txt", 'rb'), delimiter=",")
+    file.seek(0)
+    data=np.array2string(data[(data[:,0]>=timestamp)],separator=',').replace("[", "").replace("]", "").replace(" ", "")
+    file.write("")
+    file.truncate()
+    file.close()
+    lock.release()
+    pass
 #------------------------------------------------------------------------------------------------------#
 
 
@@ -262,65 +315,100 @@ class OPENBCI(threading.Thread):
         inlet = StreamInlet(streams[0])
         print("EMG stream found!")
 
-        file = open("openbci/raw/data" + ".txt", 'a+')
+        file = open("openbci/raw/data.txt", 'a+')
+        counter_save=0
         while True:
+
             sample, timestamp = inlet.pull_sample()  # get EMG data sample and its timestamp
-            file.write(timestamp+','+sample)
+            to_send=str(sample).replace("[","").replace("]","").replace(" ","")
+            if counter_save == 0:
+                lock.acquire()
+
+            file.write(str(timestamp*10**6)+','+to_send+"\n")
+            counter_save+=1
+
+            if save_raw_data_after==counter_save:
+                file.close()
+
+                file = open("openbci/raw/data.txt", 'a+')
+                lock.release()
+                counter_save = 0
+                # print(timestamp*10**6)
+                pass
 
         pass
-
 
 #---------------------------------------------------------------------------------------#
 
 
-
-
-
-
-
+lock = threading.Lock()
+save_raw_data_after = -1# will save the data into the text after x samples given
 async def main(uri):
+    # ------------parameters ---------#
 
+    sizeOfGroup =30# for the leap motion movement detection , grouping x amout of data and check if it was a movement
+    foldering_by_last=True
+    remmber_before=600
+    remmber_after=600
+    # clean_raw_data_after=100000
 
+    # ---------------------------------#
+    if foldering_by_last:
+        last=0
+        last_type="None"
+    symbol=0
+    sizeOfData = 0
     async with connect(uri) as websocket:
-        # ------------parameters ---------#
-        sizeOfData = 0
-        sizeOfGroup = 6
-        #---------------------------------#
 
         #---------dataload----------------#
         dataList_movement = [[# data list , data[0]= when y equal to zero , data[1]=when y equal to one
-               # "move1.txt",
-                "new_movement1.txt",
-                "new_movement2.txt",
+            "move1.txt",
+            "move2.txt",
+            "move3.txt",
+            "move4.txt",
+               #  "new_movement1.txt",
+               #  "new_movement2.txt",
          ]
          ,[
-             # "nomove1.txt",
-             # "nomove2.txt",
-             # "nomove3.txt",
-                "new_nomovement1.txt",
-                "new_nomovement2.txt",
-                "new_nomovement3.txt",
-                "new_nomovement4.txt"
+             "nomove1.txt",
+             "nomove2.txt",
+             "nomove3.txt",
+             "nomove4.txt",
+             "nomove5.txt",
+             "nomove6.txt",
+             "nomove7.txt",
+             "nomove8.txt",
+                # "new_nomovement1.txt",
+                # "new_nomovement2.txt",
+                # "new_nomovement3.txt",
+                # "new_nomovement4.txt"
          ]]
 
 
         dataList_classification =[[# data list , data[0]= when y equal to zero , data[1]=when y equal to one
-            # "rock2.txt",
-            # "rock3.txt"
-            "new_rock.txt"
+            "rock1.txt",
+            "rock2.txt",
+            "rock3.txt",
+            "rock4.txt",
+            "rock5.txt",
+            # "new_rock.txt"
          ]
          ,[
-            # "paper2.txt",
-            # "paper3.txt"
-            "new_paper.txt",
-            "new_paper2.txt"
+            "papper1.txt",
+            "pepper2.txt",
+            "pepper3.txt",
+            "pepper4.txt",
+            # "new_paper.txt",
+            # "new_paper2.txt"
 
          ]
           ,[
-            # "scissors2.txt",
-            # "scissors3.txt"
-            "new_scissors.txt",
-            "new_scissors2.txt"
+            "scissors1.txt",
+            "scissors2.txt",
+            "scissors3.txt",
+            "scissors4.txt",
+            # "new_scissors.txt",
+            # "new_scissors2.txt"
          ]]
 
         dataTest_classification = ["TESTOPEN.txt", "TESTCLOSE.txt"]  # the data will be only for final testing
@@ -335,11 +423,16 @@ async def main(uri):
 
         livedata_movement = []
         thread_data = [1] + [0]
+        import os
+        if os.path.exists("openbci/raw/data.txt"):
+            os.remove("openbci/raw/data.txt")
         thread = SummingThread(thread_data)
         thread.start()
         thread2 = OPENBCI(thread_data)
         thread2.start()
+        counter=0
         while True:
+
             toPredict=[]
             movementWasDetected=False
 
@@ -348,10 +441,12 @@ async def main(uri):
                 while(thread_data[0]!=0):#wait for user respond
                     msg = await websocket.recv()
                 print("start")
+                symbol+=1
 
 
 
             #data creation
+
             while sizeOfData<sizeOfGroup:#collecting samples until == size of group
                 # print("about to collect")
                 msg=await websocket.recv()
@@ -407,110 +502,26 @@ async def main(uri):
                 if(movementtype==2):
                     type="scissors"
                 print("movement is:",type)
-                createSampleBettwen(from_timestamp,to_timestamp,movementtype)
+                import time
+                time.sleep(2)
+                if foldering_by_last:
+                    print("last movement was:",last_type)
+                    createSampleBettwen(from_timestamp % 10 ** 12, to_timestamp % 10 ** 12, movementtype, str(symbol),offset_left=remmber_before,offset_right=remmber_after,foldering_by_last=foldering_by_last,last=last)
+                    last=movementtype[0]
+                    last_type=type
+                else:
+                    createSampleBettwen(from_timestamp%10**12,to_timestamp%10**12,movementtype,str(symbol),offset_left=remmber_before,offset_right=remmber_after)
+                print("cleaning")
+                cleanDataUpTo(int(to_timestamp%10**11))
+                print("cleaned")
+                counter+=1
+                print("samples created this run:", counter)
+                print("wait 2 sec")
+                import time
+                time.sleep(2)
+                print("go")
                 #save sample
             livedata_movement = []
             sizeOfData = 0
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            #     if sizeOfData<sizeOfGroup:
-            #         livedata_movement = []
-            #         sizeOfData = 0
-            #         break
-            #     movementWasDetected=True
-            #     msg=await websocket.recv()
-            #     sample=json.loads(msg)
-            #     print(sample)
-            #     if not sample["hands"]:
-            #         livedata_movement=[]
-            #         sizeOfData=0
-            #         break
-            #
-            #     toPredict+=sample
-            #     livedata_movement.append(sample)
-            #     livedata_movement = livedata_movement[1:]
-            # if movementWasDetected:
-            #     DataForOpenBCI[0].append(toPredict[0]["timestamp"])
-            #     DataForOpenBCI[1].append(toPredict[-1]["timestamp"])
-            #     DataForOpenBCI[2].append(ClassificationPredication(model_Classification,toPredict,HowmanyToPredict,"hands"))
-            #     print(DataForOpenBCI[0])
-            #     print(DataForOpenBCI[1])
-            #     print(DataForOpenBCI[2])
-            #     movementWasDetected=False
-            #     toPredict=[]
-            #     livedata_movement=[]
-            #     sizeOfData = 0
-            # msg = await websocket.recv()
-            # sample= json.loads(msg)["hands"]
-            # print(sample)
-            # if not sample:
-            #     livedata_movement = []
-            #     sizeOfData = 0
-            #     break
-            # else:
-            #     livedata_movement += sample
-            #     livedata_movement = livedata_movement[1:]
-
-        #
-        # jump =0
-        # name = input()
-        # file = open("newData/"+name +".txt", 'a+')
-        # a = [1] + [0]
-        # thread = SummingThread(a)
-        # thread.start()
-        # count = 0
-        # while True:
-        #     if a[0]==1:
-        #         print("hold")
-        #         while(a[0]!=0):
-        #             msg = await websocket.recv()
-        #         print("start")
-        #     msg = await websocket.recv()
-        #     y = json.loads(msg)
-        #     if count==jump:
-        #         count=0
-        #         if y["hands"]:
-        #
-        #             obj=y["hands"][0]
-        #             toSend=""
-        #             for i in obj:
-        #                 if i!="confidence" and i!="id" and i!="type":
-        #                     toSend+=str(obj[i])+","
-        #             toSend=toSend.replace("[","").replace("]","").replace(" ","")
-        #             file.write(toSend[:-1] + "\n")
-        #     else:
-        #         count=count+1
 
 asyncio.run(main("ws://localhost:6437/v7.json"))
