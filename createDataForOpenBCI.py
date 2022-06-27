@@ -13,7 +13,7 @@ from sklearn.ensemble import RandomForestClassifier
 
 from pylsl import StreamInlet, resolve_stream
 
-
+Folder_leap_data="G:\\git\\final_pro_sem2\\old_dir\\newData\\"
 
 
 #------------------------------------------------------------------------------------------------------#
@@ -43,6 +43,7 @@ def loadDataList(dataList,
 
 
 def BlockData(data,size,i):
+    # i = index location , size = how many to block, data = the data to apply on
     return np.array(data[i:i + size].flatten())
 
 
@@ -65,7 +66,7 @@ def load_single_data(name,sizeOfGroup,split,output,func):  # get data name with 
     #split for removeing edges, remove the size of data*2(each edge)/split
     #i=0 or 1  for the labels , if itmovement or not
     #func= func type like variance
-    data = np.loadtxt(open("G:\\git\\final_pro_sem2\\newData\\" + name, "rb"), delimiter=",")
+    data = np.loadtxt(open(Folder_leap_data + name, "rb"), delimiter=",")
     data = data[int(len(data) / split):int(len(data) - len(data) / split)]
     data = groupData(data, sizeOfGroup,func)
     labels = np.array([output] * len(data))
@@ -122,6 +123,7 @@ def sumLastKSize(add, remove,
         decision = 1
     return sum, decision
 def variance(data,size,i):
+    # i = index location , size= how many after i calculate the variance, data= the data to apply on
     return np.var(data[i:i+size], axis=0)
 
 
@@ -146,9 +148,9 @@ def studyMovement(dataList_classification, sizeOfGroup):#movement [0] no movemen
         clf.fit(X_train, y_train)
         pickle.dump(clf, open(filename, 'wb'))
     else:
-        print("loading movement model")
+        print("loading movement model\n...")
         clf = pickle.load(open(filename, 'rb'))
-    print("\n\nmovement detection succeeding rate with RandomForestClassifier:",
+    print("nmovement detection succeeding rate with RandomForestClassifier:",
           str(compare(clf.predict(X_valid), y_valid) * 100) + "%")
 
 
@@ -163,7 +165,7 @@ def studyHandGesture(dataList_movement):
     X_train, X_valid, y_train, y_valid = loadDataList(dataList_movement, 1, BlockData)
 
     if not file_exists(filename):
-        print("creating handgesture model")
+        print("creating hand gesture model")
         depth = 11
         estimators = 160
         alpha =0.001
@@ -178,10 +180,10 @@ def studyHandGesture(dataList_movement):
 
         pickle.dump(clf, open(filename, 'wb'))
     else:
-        print("loading handgesture model")
+        print("loading hand gesture model")
 
         clf=pickle.load(open(filename, 'rb'))
-    print("\n\nclassification succeeding rate with RandomForestClassifier:",
+    print("\n...\nclassification succeeding rate with RandomForestClassifier:",
           str(compare(clf.predict(X_valid), y_valid) * 100) + "%")
 
 
@@ -189,9 +191,6 @@ def studyHandGesture(dataList_movement):
     pass
 
 def movementDetected(model_Movement, data, sizeOfGroup):
-    # print("\n\n\nmovementDetected\n\n\n")
-    # print(data[0]["currentFrameRate"])
-    # print(data[0])
     clean=np.array([])
     for i in range(len(data)):
         sample=dictToArray(data[i]["hands"][0])
@@ -234,6 +233,12 @@ def collectFromOpenBciBettwen(from_timestamp, to_timestamp,offset_left=0,offset_
     print("test:",from_timestamp)
     data = np.loadtxt(open("openbci/raw/data" + ".txt", 'rb'), delimiter=",")
     index = np.nonzero((data[:,0]>=from_timestamp) & (data[:,0]<=to_timestamp))
+    print("current raw file size:",len(data))
+    print("index len:",len(index[0]))
+    print("original from",index[0][0])
+    print("original after",index[0][len(index[0]) - 1])
+    print("off left",offset_left)
+    print("off right",offset_right)
     index_a = max(index[0][0] - offset_left,0)
     index_b = min(index[0][len(index[0]) - 1] + offset_right,len(data)-1)
     return data[index_a:index_b+1]
@@ -250,6 +255,7 @@ def createSampleBettwen(from_timestamp, to_timestamp, movementtype,symbol,offset
     from_=from_timestamp
     to_=  to_timestamp
     print("test",offset_left)
+
     data=collectFromOpenBciBettwen(from_,to_,offset_left=offset_left,offset_right=offset_right)
     import sys
 
@@ -261,7 +267,8 @@ def createSampleBettwen(from_timestamp, to_timestamp, movementtype,symbol,offset
 
 
     pass
-def cleanDataUpTo():#remove the data from data up to timestamp to avoid files to heavy
+def cleanData():#remove the data from data up to timestamp to avoid files to heavy
+    print("getting lock to clean the data ")
     lock.acquire()
     file = open("openbci/raw/data" + ".txt", 'a+')
     file.seek(0)
@@ -333,9 +340,9 @@ async def main(uri):
 
     sizeOfGroup =30# for the leap motion movement detection , grouping x amout of data and check if it was a movement
     foldering_by_last=True
-    remmber_before=600
-    remmber_after=600
-
+    remmber_before=500
+    remmber_after=500
+    to_leave=300
     # ---------------------------------#
     if foldering_by_last:
         last=0
@@ -365,7 +372,7 @@ async def main(uri):
          ]]
 
 
-        dataList_classification =[[# data list , data[0]= when y equal to zero , data[1]=when y equal to one
+        dataList_classification =[[# data list , data[0]= when y equal to zero , data[1]=when y equal to one # ORDER ROCK PAPER SCISSORS
             "rock1.txt",
             "rock2.txt",
             "rock3.txt",
@@ -400,6 +407,8 @@ async def main(uri):
         import os
         if os.path.exists("openbci/raw/data.txt"):
             os.remove("openbci/raw/data.txt")
+        if not os.path.exists("openbci/raw/"):
+            os.makedirs("openbci/raw/")
         thread = SummingThread(thread_data)
         thread.start()
         thread2 = OPENBCI(thread_data)
@@ -461,7 +470,10 @@ async def main(uri):
                     type="scissors"
                 print("movement is:",type)
                 import time
-                time.sleep(2)
+                # wait a bit after movement end to get extra data
+                for i in range(3):
+                    print(5-i)
+                    time.sleep(1)
                 if foldering_by_last:
                     print("last movement was:",last_type)
                     createSampleBettwen(from_timestamp % 10 ** 12, to_timestamp % 10 ** 12, movementtype, str(symbol),offset_left=remmber_before,offset_right=remmber_after,foldering_by_last=foldering_by_last,last=last)
@@ -470,13 +482,21 @@ async def main(uri):
                 else:
                     createSampleBettwen(from_timestamp%10**12,to_timestamp%10**12,movementtype,str(symbol),offset_left=remmber_before,offset_right=remmber_after)
                 print("cleaning")
-                cleanDataUpTo(int(to_timestamp%10**11))
+                cleanData()
                 print("cleaned")
                 counter+=1
                 print("samples created this run:", counter)
+                if counter==to_leave:
+                    exit()
                 print("wait 2 sec")
                 import time
-                time.sleep(2)
+                for i in range(2):
+                    print(2-i)
+                    time.sleep(1)
+                import winsound
+                frequency = 2500  # Set Frequency To 2500 Hertz
+                duration = 100  # Set Duration To 1000 ms == 1 second
+                winsound.Beep(frequency, duration)
                 print("go")
                 #save sample
             livedata_movement = []

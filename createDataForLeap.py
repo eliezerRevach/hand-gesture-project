@@ -1,10 +1,8 @@
 import asyncio
 import threading
-from lib2to3.pgen2 import driver
 
 
 from websockets import connect
-import time
 import json
 
 class SummingThread(threading.Thread):

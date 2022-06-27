@@ -5,18 +5,17 @@ do_rms=True
 normalize=True
 do_normal_distribution=True
 max_power_file="free_records/for_mvc.txt"# path to MVC sample
-path="test_all_2d" # input path
-new_folder="test_all_2d_p"# output folder
+path="rock_paper_scissor_380size_csv" # input path
+new_folder="rock_paper_scissor_380size_RMS_CSV"# output folder
 window_size=50# window for RMS
-std_from_multipli=2#mean - std*multipli... -> start of sample
+std_from_multipli=1.5#mean - std*multipli... -> start of sample
 std_to_multipli=2#mean + std*multipli... -> end of sample
-rms_before_norm=True
+
 add_zeros=True
 #----#
-complete_to=512*2
+complete_to=512*3
 #----#
-var=True
-frame_size=50 # var window
+
 
 
 def rolling_rms(x, N):# create mRMS from array
@@ -31,7 +30,7 @@ def toRMS(Array2d_result,MVC=None):#create an mRMS 2d array with the ability to 
         if normalize:
             arr=arr/MVC[i]
         re_array=np.vstack([re_array,arr])
-    return re_array[len(Array2d_result):]
+    return re_array[Array2d_result:]
     pass
 def updateFile(path, File,Array2d_result):# save the data at the path , create if file doesnt exist else add
     if not os.path.exists(path):
@@ -50,20 +49,9 @@ def load_file(file_path):# load a file by path including remove of broken sample
 def get_mvc(file_path):# calculate mvc by useing mean o
     return np.mean(np.abs(load_file(file_path)),axis=0)
     pass
-def var_by_frame(arr,frame_size):
-    re_Arr = np.array([0.] * (len(arr)))
-    for i in range(len(arr) - (frame_size - 1)):
-        re_Arr[i] = np.var(arr[i:i + frame_size])
-    tempArr = re_Arr[0:len(re_Arr) - frame_size]
-    re_Arr = np.append([0.] * int(frame_size / 2), tempArr)
-    re_Arr = np.append(re_Arr, [0.] * int(frame_size / 2))
-    return re_Arr
-    pass
 
 def normal_distribution(arr):# useing normal distribution on the data to get std and mean
   arr=np.absolute(arr)
-  if var:
-    arr = var_by_frame(arr, frame_size)
   mean=0
   std=0
   for i in range(len(arr)):
@@ -80,10 +68,7 @@ def twoD_normal_distribution(Array2d_result):# getting std and mean arrays' from
     mean_arr = []
     std_arr = []
     for i in range(len(Array2d_result)):
-        if rms_before_norm:
-            mean, std = normal_distribution(rolling_rms(Array2d_result[i],window_size))
-        else:
-            mean, std = normal_distribution(Array2d_result[i])
+        mean, std = normal_distribution(Array2d_result[i])
         mean_arr.append(mean)
         std_arr.append(std)
     return mean_arr,std_arr
@@ -91,38 +76,12 @@ def twoD_normal_distribution(Array2d_result):# getting std and mean arrays' from
 
 
 def twoD_cut_by_std(Array2d_result, mean_arr, std_arr, std_from_multipli, std_to_multipli):# cut a sample bettwen [mean-from*std] to [mean+to*std]
-    re_array=Array2d_result[:,0:complete_to]
-    print("mean:",mean_arr)
-    print("std:",std_arr)
+    re_array=Array2d_result
     for i in range(len(Array2d_result)):
-        mean_int=int(mean_arr[i])
-        std_int=int(std_arr[i])
-        std_left=int(std_int*std_from_multipli)
-        std_right=int(std_int*std_to_multipli)
-
-        from_mean_to_left_size= std_left if mean_int>std_left else mean_int
-        from_mean_to_right=std_right if mean_int+std_right<len(Array2d_result[i]) else  len(Array2d_result[i])-mean_int
-
-        arr=Array2d_result[i][mean_int-from_mean_to_left_size:mean_int+from_mean_to_right]
-
-        half_of_complete_to=int(complete_to/2)
-        add_zeros_to_left=half_of_complete_to-from_mean_to_left_size
-        add_zeros_to_right=half_of_complete_to-from_mean_to_right
-
-        if add_zeros_to_right<0 and add_zeros_to_left<0:
-            arr=arr[from_mean_to_left_size-half_of_complete_to:from_mean_to_left_size+half_of_complete_to] # mean[i]= from mean to left
-
-            add_zeros_to_left=0
-            add_zeros_to_right=0
-
-        elif add_zeros_to_right<0:
-            arr=arr[0:from_mean_to_left_size+half_of_complete_to]
-            add_zeros_to_right=0
-        elif add_zeros_to_left<0:
-            arr=arr[from_mean_to_left_size-half_of_complete_to:]
-            add_zeros_to_left=0
-
-        arr = np.pad(arr,(add_zeros_to_left,add_zeros_to_right))
+        arr=Array2d_result[i][int(max(mean_arr[i]-std_arr[i]*std_from_multipli,0)):int(min(mean_arr[i]+std_arr[i]*std_to_multipli,complete_to))]
+        left_mis=int(max(mean_arr[i]-std_arr[i]*std_from_multipli,0))
+        right_mis=complete_to-int(min(mean_arr[i]+std_arr[i]*std_to_multipli,complete_to))
+        arr = np.pad(arr,(left_mis,right_mis))
         re_array=np.vstack([re_array,arr])
     return re_array[len(Array2d_result):]
     pass

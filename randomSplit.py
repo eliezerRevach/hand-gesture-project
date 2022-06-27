@@ -4,9 +4,9 @@ import random
 from shutil import copyfile
 
 
-folder_input="test_movement"
-output_folder='test_movement_train_test'
-percent=0.8
+path_folder_input="no_move2_p"
+path_output_folder='train_test_movement_02'
+percent=0.85
 def img_train_test_split(file_source_dir, train_size):
     """
     Randomly splits images over a train and validation folder, while preserving the folder structure
@@ -29,16 +29,16 @@ def img_train_test_split(file_source_dir, train_size):
         raise AttributeError('train_size must be a float')
 
     # Set up empty folder structure if not exists
-    if not os.path.exists(output_folder):
-        os.makedirs(output_folder)
+    if not os.path.exists(path_output_folder):
+        os.makedirs(path_output_folder)
     else:
-        if not os.path.exists(output_folder+'/train'):
-            os.makedirs(output_folder+'/train')
-        if not os.path.exists(output_folder+'/validation'):
-            os.makedirs(output_folder+'/validation')
+        if not os.path.exists(path_output_folder+'/train'):
+            os.makedirs(path_output_folder+'/train')
+        if not os.path.exists(path_output_folder+'/validation'):
+            os.makedirs(path_output_folder+'/validation')
 
     # Get the subdirectories in the main file folder
-    subdirs = [subdir for subdir in os.listdir(file_source_dir) if os.path.isdir(os.path.join(img_source_dir, subdir))]
+    subdirs = [subdir for subdir in os.listdir(file_source_dir) if os.path.isdir(os.path.join(file_source_dir, subdir))]
 
     for subdir in subdirs:
         subdir_fullpath = os.path.join(file_source_dir, subdir)
@@ -46,8 +46,8 @@ def img_train_test_split(file_source_dir, train_size):
             print(subdir_fullpath + ' is empty')
             break
 
-        train_subdir = os.path.join(output_folder+'/train', subdir)
-        validation_subdir = os.path.join(output_folder+'/validation', subdir)
+        train_subdir = os.path.join(path_output_folder+'/train', subdir)
+        validation_subdir = os.path.join(path_output_folder+'/validation', subdir)
 
         # Create subdirectories in train and validation folders
         if not os.path.exists(train_subdir):
@@ -78,4 +78,4 @@ def img_train_test_split(file_source_dir, train_size):
 
 
 
-img_train_test_split(folder_input+"/", percent)
+img_train_test_split(path_folder_input+"/", percent)

@@ -2,8 +2,8 @@
 constSize=False
 #-----------#
 resizeTo=512*3
-folder="rock_paper_scissor_380size/"
-output_folder="rock_paper_scissor_380size_csv"
+folder="test_all/"# input
+output_folder="test_all_2d"
 channel_from=2
 channel_to=4
 raw_exist=0
@@ -47,14 +47,16 @@ def openData(dir_name):
     for folder_name in folders:
 
 
-        if folder_name!="raw":
+        if folder_name!="raw" and folder_name!="with_last":
             folder=os.listdir(dir_name+"/"+folder_name)
             for file_name in folder:
                 file_path=dir_name+"/"+folder_name+"/"+file_name
                 data=load_file(file_path)
-                print(type_Counter)
-                data_List[type_Counter]=data
-
+                print("load_file",type_Counter,"from",folder_name)
+                if len(data_List[type_Counter])==0 :
+                    data_List[type_Counter]=data
+                else:
+                    data_List[type_Counter]=np.concatenate((data_List[type_Counter],data))
         type_Counter+=1
     return data_List
     pass
