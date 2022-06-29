@@ -1,7 +1,9 @@
+import os
 import sys
 import threading
 import time
 
+import asyncio
 import websockets
 
 import data_proccesing as dp
@@ -16,11 +18,11 @@ LM=50000#Last to remmber, an array that openbci keep feilling and droping the la
 size_of_movement_frame_after_rms=450#movement sample size after proccesing
 size_of_movement=512# raw data size of movement sample
 window_size=50# window size for rms
-extra_samples=500# extra samples to start with with raw data for predict hand gesture
+extra_samples=300# extra samples to start with with raw data for predict hand gesture
 imu = IMU(path="COM8")# usb port of IMU
 ignore_channels=[0,1]# emg channels wanted to ingonre/ not in use
 
-std_from_multipli=1.5#mean - std*multipli... -> start of sample
+std_from_multipli=2#mean - std*multipli... -> start of sample
 std_to_multipli=2#mean + std*multipli... -> end of sample
 var=True# use var for normal distrubation
 var_size=50# size of frame for var in normal distrubtuion
@@ -28,28 +30,37 @@ time_to_wait=2# time delay before predicting the gesture // higher better predic
 raw_const_size_movement=512# size of the window frame to detect movement
 raw_const_size_hand_gesture=512*3# raw size its getting
 size_of_gesture_final=512*2# final size getting into the nn for gesture prediction
-normalize=False# normalizing the data by the mvc
+normalize=True# normalizing the data by the mvc
+
+load_mvc=True# will load from file the mvc insted of creating it
+#-------------#
+mvc_path="free_records/for_mvc.txt"# path to file for the mvc
+#-------------#
 NUM_OF_CHANNELS=4# number of channel of the openbci device
 reshape_to=4# reshape the samples of each channel to 2d array ,sould be equal to number of channels to
 wanted_size_of_mvc=5000# how many samples to collect when creating mvc
-imu_channels=6
+imu_channels=6# number of arrays of data from imu (acceleation xyz ,and angle xyz)
+
+
+certain_state_mod=True
+#------------------# if the one ubove true then:------#
+default="rock"# first state of hand when starting the device
+path_to_rock_state_model="model_rock"# path to nn from rock
+path_to_paper_state_model="model_paper"# path to nn from paper
+path_to_scissors_state_model="model_scissors"# path to nn from scissors
+#-----------------------------------------------------#
+path_to_gesture_model="model_irnn"# path to irnn model for classic predication, if certain_state_mod is false
+
 #---- nn params
 device = torch.device('cpu')
 #RNN movement model
-path_to_movement_model="model_rnn"
-RNN_layers=3
-RNN_Classes=2
+path_to_movement_model="model_movement_RNN"
+RNN_layers=3#
+RNN_Classes=2# movement and no movement, 2 classes
 sequence_length=1
 #IRNN type model
-certain_state_mod=True
-path_to_gesture_model="model_irnn"
-default="rock"
-path_to_rock_state_model="model_irnn_rock"
-path_to_paper_state_model="model_irnn_paper"
-path_to_scissors_state_model="model_irnn_scissors"
-
 IRNN_layers=3
-IRNN_Classes=3
+IRNN_Classes=2
 time_steps=100
 batch_norm=True
 bidirectional=True
@@ -112,7 +123,7 @@ class RNN(nn.Module):
 #---------------------------------------------------------------------------------------------------------------------#
 normalize_array=None
 Arr=np.array([[0.]*5]*LM)# created stack to remmber LM Last samples
-Arr_imu=np.array([[0.]*7]*LM)# created stack to remmber LM Last samples
+Arr_imu=np.array([[0.]*6]*LM)# created stack to remmber LM Last samples
 
 def imu_current_sample():
 
@@ -140,6 +151,7 @@ class OPENBCI(threading.Thread):
             sample, timestamp = inlet.pull_sample()  # get EMG data sample and its timestamp
             Arr[:-1] = Arr[1:]
             Arr[-1] = np.append([timestamp],sample)
+
             Arr_imu[:-1] = Arr_imu[1:]
             Arr_imu[-1] = imu_current_sample()
 
@@ -169,6 +181,7 @@ def TwoDof(sample, reshape_to, ignore_channels,const_size=-1):
     A=sample[:, :].flatten()
     A=np.reshape(A, (-1, reshape_to)).T
     if const_size !=-1:
+        print(len(A[0]))
         A = np.pad(A, ((0, 0), (0, const_size - len(A[0]))))
     if ignore_channels:
         A=np.delete(A,ignore_channels,axis=0)
@@ -204,14 +217,15 @@ def collectDataBettwen(first_timestamp, last_timestamp, extra_samples):# get's a
 
 def process_movement(sample, final_size, window_size=False,normalize=False):# do rms on the movement sample
     if normalize:
-        return dp.toRMS(sample,normalize_array,window_size=window_size,complete_to_final=final_size)
+        return dp.toRMS(sample,normalize_array,window_size=window_size,complete_to_final=final_size,do_mvc=normalize)
     return dp.toRMS(sample,window_size=window_size,complete_to_final=final_size)
     pass
 
 
 def process_gesture(sample, raw_size,final_size, window_size,normalize):# do normal distribution to get the borders using mean and std of the sample  and then rms
     mean_arr,std_arr=dp.twoD_normal_distribution(sample,var_farme_size=var_size,var=var)
-    cutted_by_normal_distribution=dp.twoD_cut_by_std(sample,mean_arr,std_arr,std_from_multipli,std_to_multipli,raw_size)
+    cutted_by_normal_distribution=dp.twoD_cut_by_std(sample,mean_arr,std_arr,std_from_multipli,std_to_multipli,final_size)
+    into_graph(cutted_by_normal_distribution)
     if normalize:
         return dp.toRMS(cutted_by_normal_distribution,normalize_array,window_size=window_size,complete_to_final=final_size)
     return dp.toRMS(cutted_by_normal_distribution,window_size=window_size,complete_to_final=final_size)
@@ -219,7 +233,7 @@ def process_gesture(sample, raw_size,final_size, window_size,normalize):# do nor
 
 
 def get_input_size_of_RNN():#calculate the input size for the rnn model depending on the number of channels
-    return size_of_movement_frame_after_rms*(NUM_OF_CHANNELS-len(ignore_channels))
+    return size_of_movement_frame_after_rms*(NUM_OF_CHANNELS-len(ignore_channels)+imu_channels)
     pass
 
 
@@ -236,7 +250,7 @@ def np_to_torch(sample):# take a numpy array , and transforming it to torch arra
 
 
 def predict_movement(sample,model,imu_sample):
-    combined_sample=np.vstack((sample,imu_sample))
+    combined_sample=np.vstack((sample,imu_sample[:,0:size_of_movement_frame_after_rms]))
     model.eval()
     outputs = model(np_to_torch(combined_sample).reshape(-1, sequence_length, get_input_size_of_RNN()).to(device))
     _, predicted = torch.max(outputs.data, 1)
@@ -304,12 +318,89 @@ def defult_model(model_gesture_rock, model_gesture_paper, model_gesture_scissors
         return model_gesture_scissors
     pass
 
+import torch
+import numpy as np
+from torch.utils.data import TensorDataset, DataLoader
+
+def load_data(path,show_all=False):
+  folders = os.listdir(path)
+  my_x=[]
+  my_y=[]
+  for Class in folders:
+    files=os.listdir(path+"/"+Class)
+    for File in files:
+      # print(path+"/"+Class+"/"+File, "is class is:"+ Class)
+      CSVData = open(path+"/"+Class+"/"+File)
+      Array2d_result = np.loadtxt(CSVData, delimiter=",")
+      if show_all:
+        print("Class:",Class)
+
+      my_x.append(np.array(Array2d_result))
+      my_y.append((float(Class)))
+  tensor_x = torch.Tensor(my_x) # transform to torch tensor
+  tensor_y = torch.Tensor(np.array(my_y)).type(torch.LongTensor)
+  return TensorDataset(tensor_x,tensor_y)
+
+
+import numpy as np
+import matplotlib.pyplot as plt
+def plotArray(arr):
+  x=np.arange(0, len(arr))
+  y=arr
+  plt.title("Line graph")
+  plt.xlabel("X axis")
+  plt.ylabel("Y axis")
+  plt.plot(x, y, color ="red")
+  plt.show()
+def into_graph(two_d_arr):
+  for i in range(len(two_d_arr)):
+    plotArray(two_d_arr[i])
+
+# Test the model
+def testing(model,test_loader):
+  # model.eval()
+  with torch.no_grad():
+      correct = 0
+      total = 0
+      for images, labels in test_loader:
+          images = images.reshape(-1,sequence_length, get_input_size_of_IRNN()).to(device)
+
+          labels = labels.to(device)
+          outputs = model(images)
+
+          _, predicted = torch.max(outputs.data, 1)
+
+          total += labels.size(0)
+
+          correct += (predicted == labels).sum().item()
+
+      # print('Test Accuracy of the model on the 10000 test images: {} %'.format(100 * correct / total))
+      print('Test Accuracy of the model on '+str(total)+' samples is: {}%'.format(100 * correct / total)+', '+str(correct)+' was correct')
+
+  return 100 * correct / total
+def test_model(model_gesture, path):
+    test_dataset = load_data(path + '/validation')
+    test_loader = torch.utils.data.DataLoader(dataset=test_dataset,
+                                              batch_size=1024,
+                                              shuffle=False)
+    testing(model_gesture, test_loader)
+    pass
+
+
 
 def main():
     if certain_state_mod:
         model_gesture_rock=load_model(path_to_rock_state_model,"IRNN")
         model_gesture_paper = load_model(path_to_paper_state_model, "IRNN")
         model_gesture_scissors = load_model(path_to_scissors_state_model, "IRNN")
+        print("test models:")
+        model_gesture=model_gesture_rock
+        test_model(model_gesture,"from_rock_model_data_2d_p_train_test")
+        model_gesture=model_gesture_paper
+        test_model(model_gesture,"from_paper_model_data_2d_p_train_test")
+        model_gesture=model_gesture_scissors
+        test_model(model_gesture,"from_scissors_model_data_2d_p_train_test")
+
         model_gesture=defult_model(model_gesture_rock,model_gesture_paper,model_gesture_scissors)
         current_model=default
     else:
@@ -317,16 +408,20 @@ def main():
 
     model_movement = load_model(path_to_movement_model,"RNN")
     if normalize:
-        print("press enter to MVC start, use max force until it will tell u to stop, it will take around 10 sec ")
-        x=input()
-        data=collectXSamplesfromBCI(wanted_size_of_mvc)
         global normalize_array
-        normalize_array= To_MVC(data)
+
+        if load_mvc:
+            normalize_array=dp.get_mvc(mvc_path)
+        else:
+            print("press enter to MVC start, use max force until it will tell u to stop, it will take around 10 sec ")
+            x=input()
+            data=collectXSamplesfromBCI(wanted_size_of_mvc)
+            normalize_array= To_MVC(data)
     print("to start press enter")
     x = input()
     thread2 = OPENBCI(Arr)
     thread2.start()
-    wait(2)
+    wait(4)
 
     while True:
         r"""
@@ -341,11 +436,12 @@ def main():
         sample=process_movement(TwoDof(remove_timestamp(sample),reshape_to,ignore_channels,const_size=raw_const_size_movement),size_of_movement_frame_after_rms,window_size,normalize)
 
         if predict_movement(sample,model_movement,imu_sample):
-            while predict_movement(sample,model_movement):
+            while predict_movement(sample,model_movement,imu_sample):
                 sample = collect_last_data(size_of_movement)
+                imu_sample = TwoDof(collect_last_data_from_imu(size_of_movement), imu_channels, None)
                 last_timestamp = get_last_timestamp(sample)
                 sample = process_movement(TwoDof(remove_timestamp(sample),reshape_to,ignore_channels,const_size=raw_const_size_movement), size_of_movement_frame_after_rms,window_size,normalize)
-            print("waiting 1 sec")
+            print("waiting "+str(time_to_wait)+" sec")# waiting for more data to come so get a large sample
             wait(time_to_wait)
 
             r"""
@@ -358,50 +454,58 @@ def main():
             in2d=TwoDof(remove_timestamp(sample),reshape_to,ignore_channels,const_size=raw_const_size_hand_gesture)
             print(in2d.shape)
             sample=process_gesture(in2d,raw_const_size_hand_gesture,size_of_gesture_final,window_size,normalize)
+            into_graph(sample)
             results=predict_gesture(sample,model_gesture)
-            if certain_state_mod:
+            if certain_state_mod:# in sending the predicted gesture and setting the current model as the model of the predication
                 if current_model == "rock":
                     if results == 0:
-                        send_gesture("paper")
+                        print("paper")
+                        asyncio.run(send_gesture("paper"))
                         current_model="paper"
                         model_gesture=model_gesture_paper
 
                     elif results == 1:
-                        send_gesture("scisssors")
-                        current_model="scisssors"
+                        print("scissors")
+                        asyncio.run(send_gesture("scissors"))
+                        current_model="scissors"
                         model_gesture=model_gesture_scissors
 
                 elif current_model == "paper":
                     if results == 0:
-                        send_gesture("rock")
+                        print("rock")
+                        asyncio.run(send_gesture("rock"))
                         current_model="rock"
                         model_gesture=model_gesture_rock
 
                     elif results == 1:
-                        send_gesture("scisssors")
-                        current_model="scisssors"
+                        print("scissors")
+                        asyncio.run(send_gesture("scissors"))
+                        current_model="scissors"
                         model_gesture=model_gesture_scissors
 
-                elif current_model == "scisssors":
+                elif current_model == "scissors":
                     if results == 0:
-                        send_gesture("rock")
+                        print("rock")
+                        asyncio.run(send_gesture("rock"))
                         current_model="rock"
                         model_gesture=model_gesture_rock
 
                     elif results == 1:
-                        send_gesture("paper")
+                        print("paper")
+                        asyncio.run(send_gesture("paper"))
                         current_model="paper"
                         model_gesture=model_gesture_paper
             else:
                 if results==0:
-                    send_gesture("rock")
+                    asyncio.run(send_gesture("rock"))
                 elif results==1:
-                    send_gesture("paper")
+                    asyncio.run(send_gesture("paper"))
                 else:
-                    send_gesture("scissors")
+                    asyncio.run(send_gesture("scissors"))
             wait(1)
 
-def send_gesture(name):# send to unity hand gesture
+async def send_gesture(name):# send to unity for showing in 3d the hand gesture
+    print(name)
     async with websockets.connect("ws://127.0.0.1:7891/gesture") as websocket:
         await websocket.send(name)
 

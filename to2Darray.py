@@ -2,8 +2,8 @@
 constSize=False
 #-----------#
 resizeTo=512*3
-folder="test_all/"# input
-output_folder="test_all_2d"
+path_folder="from_scissors_model_data/"# input
+output_folder="from_scissors_model_data_2d"
 channel_from=2
 channel_to=4
 raw_exist=0
@@ -64,7 +64,7 @@ def openData(dir_name):
 
 
 
-data=openData(folder)#3d array, [hand gesture type(0,1,2),sample arrays]
+data=openData(path_folder)#3d array, [hand gesture type(0,1,2),sample arrays]
 for i in range(len(data)):
     print(i)
     for j in range(len(data[i])):

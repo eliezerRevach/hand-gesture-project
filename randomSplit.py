@@ -4,8 +4,8 @@ import random
 from shutil import copyfile
 
 
-path_folder_input="no_move2_p"
-path_output_folder='train_test_movement_02'
+path_folder_input="from_scissors_model_data_2d_p"
+path_output_folder='from_scissors_model_data_2d_p_train_test'
 percent=0.85
 def img_train_test_split(file_source_dir, train_size):
     """

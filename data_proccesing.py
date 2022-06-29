@@ -1,11 +1,50 @@
 import os
 import numpy as np
 
+
+def bp_low_pass(fft_sample, low_pass, device_hz,curve=3):
+    fc_1=low_pass
+    fc_2=max(low_pass-curve,0)
+    N=len(fft_sample)
+    fc_1_by_index=fc_1*N/device_hz
+    fc_2_by_index=fc_2*N/device_hz
+    func = lambda x:1 if (x>fc_1_by_index)  \
+               else 0 if (x<fc_2_by_index) \
+               else ((x-fc_1_by_index)**2)/\
+                    ((fc_1_by_index-fc_2_by_index)**2)
+
+    return fft_sample*func(fft_sample)
+
+    pass
+
+
+def bp_high_pass(fft_sample, low_pass, device_hz,curve=3):
+    fc_1 = low_pass
+    fc_2 = min(low_pass + curve, device_hz)
+    N = len(fft_sample)
+    fc_1_by_index = fc_1 * N / device_hz
+    fc_2_by_index = fc_2 * N / device_hz
+    func = lambda x: 1 if (x < fc_1_by_index) \
+                else 0 if (x > fc_2_by_index) \
+                else (1-(((x - fc_1_by_index) ** 2) /
+                      ((fc_1_by_index - fc_2_by_index) ** 2)))
+    return fft_sample * func(fft_sample)
+
+    pass
+
+
+def bandpass_filter(sample,low_pass=15,high_pass=90,device_hz=200):
+    fft_sample=np.fft(sample)
+    fft_sample=bp_low_pass(fft_sample,low_pass,device_hz)
+    fft_sample=bp_high_pass(fft_sample,high_pass,device_hz)
+
+    return np.ifft(fft_sample)
+
 def rolling_rms(x, N):
   xc = np.cumsum(abs(x) ** 2);
   return np.sqrt((xc[N:] - xc[:-N]) / N)
 
-def toRMS(Array2d_result,MVC=None,window_size=50,complete_to_final=200):
+def toRMS(Array2d_result,MVC=None,window_size=50,complete_to_final=200,do_mvc=False):
     #rms on 2d array, with a window size, if to do mvc normaliztion and output size
     re_array=Array2d_result[:,0:complete_to_final]
     array_len=len(Array2d_result)
@@ -15,7 +54,7 @@ def toRMS(Array2d_result,MVC=None,window_size=50,complete_to_final=200):
             arr=arr[0:complete_to_final]
         else:
             arr = np.pad(arr, (0, complete_to_final - len(arr)))
-        if MVC:
+        if do_mvc:
             arr=arr/MVC[i]
         re_array=np.vstack([re_array,arr])
     return re_array[array_len:]
@@ -32,7 +71,16 @@ def var_by_frame(arr,frame_size):
     re_Arr = np.append(re_Arr, [0.] * int(frame_size / 2))
     return re_Arr
     pass
-
+def load_file(file_path):# load a file by path including remove of broken samples
+    txt = open(file_path).read()
+    alist = []
+    for line in txt.splitlines():
+        if '...' not in line:
+            alist.append([float(i) for i in line.split(',')])
+    return alist
+def get_mvc(file_path):# get mean of a entire data file, used on the max power
+    return np.mean(np.abs(load_file(file_path)),axis=0)
+    pass
 
 def normal_distribution(arr, frame_size=50,var=False):# useing normal distribution on the data to get std and mean
   #getting an arr , acting as it was an histogram , and calculating mean and std, based on location * value
@@ -56,7 +104,7 @@ def twoD_normal_distribution(Array2d_result,var_farme_size=50,var=False):# getti
     mean_arr = []
     std_arr = []
     for i in range(len(Array2d_result)):
-        mean, std = normal_distribution(Array2d_result[i],frame_size=var_farme_size,var=var)
+        mean, std = normal_distribution(rolling_rms(Array2d_result[i],var_farme_size),frame_size=var_farme_size,var=var)
         mean_arr.append(mean)
         std_arr.append(std)
     return mean_arr,std_arr

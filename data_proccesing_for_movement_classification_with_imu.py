@@ -13,10 +13,10 @@ window_size=50
 complete_to_final=450
 normalize=True
 max_power_file="free_records/for_mvc.txt"
-path="move" # input
+path="nomove_withimu" # input
 procces_channel_up_to=2
-new_folder="move2_p/"
-Class_output_name="1/"
+new_folder="nomove3_p/"
+Class_output_name="0/"
 folders = os.listdir(path)
 MVC=None
 
