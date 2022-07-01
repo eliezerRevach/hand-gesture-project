@@ -14,7 +14,8 @@ from sklearn.ensemble import RandomForestClassifier
 from pylsl import StreamInlet, resolve_stream
 
 Folder_leap_data="G:\\git\\final_pro_sem2\\old_dir\\newData\\"
-
+lock = threading.Lock()
+realse_lock_after = 30# will save the data into the text after x samples given
 
 #------------------------------------------------------------------------------------------------------#
 
@@ -230,15 +231,15 @@ def dictToArray(data):
 
 
 def collectFromOpenBciBettwen(from_timestamp, to_timestamp,offset_left=0,offset_right=0):
-    print("test:",from_timestamp)
+    # print("test:",from_timestamp)
     data = np.loadtxt(open("openbci/raw/data" + ".txt", 'rb'), delimiter=",")
     index = np.nonzero((data[:,0]>=from_timestamp) & (data[:,0]<=to_timestamp))
-    print("current raw file size:",len(data))
-    print("index len:",len(index[0]))
-    print("original from",index[0][0])
-    print("original after",index[0][len(index[0]) - 1])
-    print("off left",offset_left)
-    print("off right",offset_right)
+    # print("current raw file size:",len(data))
+    # print("index len:",len(index[0]))
+    # print("original from",index[0][0])
+    # print("original after",index[0][len(index[0]) - 1])
+    # print("off left",offset_left)
+    # print("off right",offset_right)
     index_a = max(index[0][0] - offset_left,0)
     index_b = min(index[0][len(index[0]) - 1] + offset_right,len(data)-1)
     return data[index_a:index_b+1]
@@ -254,13 +255,13 @@ def createSampleBettwen(from_timestamp, to_timestamp, movementtype,symbol,offset
     file = open(path + "data" +symbol + ".txt", 'a+')
     from_=from_timestamp
     to_=  to_timestamp
-    print("test",offset_left)
+    # print("test",offset_left)
 
     data=collectFromOpenBciBettwen(from_,to_,offset_left=offset_left,offset_right=offset_right)
     import sys
 
     np.set_printoptions(threshold=sys.maxsize)
-    print("data len:",len(data))
+    # print("data len:",len(data))
     #cleaning the data for a string to write in file leaveing only the samples without the timestamps
     to_send=np.array2string(data[:, 1:].flatten(), separator=',').replace("[", "").replace("]", "").replace(" ", "").replace("\n", "")
     file.write(to_send+'\n')
@@ -268,7 +269,7 @@ def createSampleBettwen(from_timestamp, to_timestamp, movementtype,symbol,offset
 
     pass
 def cleanData():#remove the data from data up to timestamp to avoid files to heavy
-    print("getting lock to clean the data ")
+    # print("getting lock to clean the data ")
     lock.acquire()
     file = open("openbci/raw/data" + ".txt", 'a+')
     file.seek(0)
@@ -277,6 +278,19 @@ def cleanData():#remove the data from data up to timestamp to avoid files to hea
     file.close()
     lock.release()
     pass
+
+def print_results(type, from_timestamp, to_timestamp, last_type, foldering_by_last):
+    import pandas
+    if foldering_by_last:
+        data=[last_type,type,str(from_timestamp),str(to_timestamp)]
+        list_names=["last hand gesture","new hand gesture","first timestamp","sec timestamp"]
+
+    else:
+        data=[type,str(from_timestamp),str(to_timestamp)]
+        list_names=["hand gesture","first timestamp","sec timestamp"]
+    pandas.DataFrame(data, list_names, "sample")
+    pass
+
 #------------------------------------------------------------------------------------------------------#
 
 
@@ -333,8 +347,10 @@ class OPENBCI(threading.Thread):
 #---------------------------------------------------------------------------------------#
 
 
-lock = threading.Lock()
-realse_lock_after = 30# will save the data into the text after x samples given
+
+
+
+
 async def main(uri):
     # ------------parameters ---------#
 
@@ -346,7 +362,7 @@ async def main(uri):
     # ---------------------------------#
     if foldering_by_last:
         last=0
-        last_type="None"
+    last_type="None"
     symbol=0
     sizeOfData = 0
     async with connect(uri) as websocket:
@@ -417,10 +433,10 @@ async def main(uri):
         while True:
 
             if thread_data[0]==1:#user on stop
-                print("hold")
+                print("press enter to start")
                 while(thread_data[0]!=0):#wait for user respond
                     msg = await websocket.recv()
-                print("start")
+                print("starting...")
                 symbol+=1
 
 
@@ -439,13 +455,13 @@ async def main(uri):
 
             if movementDetected(model_Movement,livedata_movement,sizeOfGroup):
                 print("movement DETECTED!!!")
-                print("create time stamp")
+                # print("create time stamp")
                 print(livedata_movement[0]['timestamp'])
                 from_timestamp=livedata_movement[0]['timestamp']
                 while(movementDetected(model_Movement,livedata_movement,sizeOfGroup)):
                     livedata_movement = []
                     sizeOfData = 0
-                    print("still moveing")
+                    # print("still moving")
                     # data creation
                     while sizeOfData < sizeOfGroup:  # collecting samples until == size of group
                         msg = await websocket.recv()
@@ -456,9 +472,9 @@ async def main(uri):
                         else:
                             livedata_movement.append(sample)
                             sizeOfData += 1
-                print("movement stopped!!!")
-                print("create time stamp")
-                print(livedata_movement[-1]['timestamp'])
+                # print("movement stopped!!!")
+                # print("create time stamp")
+                # print(livedata_movement[-1]['timestamp'])
                 # timestamp=getTimestamp
                 to_timestamp = livedata_movement[-1]['timestamp']
                 movementtype=model_Classification.predict(np.array([dictToArray(livedata_movement[-1]["hands"][0])]))
@@ -468,27 +484,29 @@ async def main(uri):
                     type="pipper"
                 if(movementtype==2):
                     type="scissors"
-                print("movement is:",type)
+                # print("movement is:",type)# here add list
+                print_results(type,from_timestamp,to_timestamp,last_type,foldering_by_last)
                 import time
                 # wait a bit after movement end to get extra data
+                print("Please wait 5 sec before moving hand.")
                 for i in range(3):
                     print(5-i)
                     time.sleep(1)
                 if foldering_by_last:
-                    print("last movement was:",last_type)
+                    # print("last movement was:",last_type)
                     createSampleBettwen(from_timestamp % 10 ** 12, to_timestamp % 10 ** 12, movementtype, str(symbol),offset_left=remmber_before,offset_right=remmber_after,foldering_by_last=foldering_by_last,last=last)
                     last=movementtype[0]
                     last_type=type
                 else:
                     createSampleBettwen(from_timestamp%10**12,to_timestamp%10**12,movementtype,str(symbol),offset_left=remmber_before,offset_right=remmber_after)
-                print("cleaning")
+                # print("cleaning")
                 cleanData()
-                print("cleaned")
+                # print("cleaned")
                 counter+=1
-                print("samples created this run:", counter)
+                # print("samples created this run:", counter)
                 if counter==to_leave:
                     exit()
-                print("wait 2 sec")
+                # print("wait 2 sec")
                 import time
                 for i in range(2):
                     print(2-i)
@@ -497,7 +515,7 @@ async def main(uri):
                 frequency = 2500  # Set Frequency To 2500 Hertz
                 duration = 100  # Set Duration To 1000 ms == 1 second
                 winsound.Beep(frequency, duration)
-                print("go")
+                print("Ridy")
                 #save sample
             livedata_movement = []
             sizeOfData = 0
