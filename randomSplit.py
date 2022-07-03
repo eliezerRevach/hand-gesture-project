@@ -4,9 +4,9 @@ import random
 from shutil import copyfile
 
 
-path_folder_input="from_scissors_model_data_2d_p"
-path_output_folder='from_scissors_model_data_2d_p_train_test'
-percent=0.85
+path_folder_input="all_2d_paper_p"
+path_output_folder='all_2d_paper_p_train_test'
+percent=0.9
 def img_train_test_split(file_source_dir, train_size):
     """
     Randomly splits images over a train and validation folder, while preserving the folder structure

@@ -8,12 +8,13 @@ def bp_low_pass(fft_sample, low_pass, device_hz,curve=3):
     N=len(fft_sample)
     fc_1_by_index=fc_1*N/device_hz
     fc_2_by_index=fc_2*N/device_hz
-    func = lambda x:1 if (x>fc_1_by_index)  \
-               else 0 if (x<fc_2_by_index) \
-               else ((x-fc_1_by_index)**2)/\
-                    ((fc_1_by_index-fc_2_by_index)**2)
 
-    return fft_sample*func(fft_sample)
+    H=np.copy(fft_sample)
+    H=(((H-fc_1_by_index)**2)/((fc_1_by_index-fc_2_by_index)**2))
+    H[0:fc_2_by_index]=0
+    H[fc_1_by_index:]=1
+
+    return fft_sample*H
 
     pass
 
@@ -24,21 +25,22 @@ def bp_high_pass(fft_sample, low_pass, device_hz,curve=3):
     N = len(fft_sample)
     fc_1_by_index = fc_1 * N / device_hz
     fc_2_by_index = fc_2 * N / device_hz
-    func = lambda x: 1 if (x < fc_1_by_index) \
-                else 0 if (x > fc_2_by_index) \
-                else (1-(((x - fc_1_by_index) ** 2) /
-                      ((fc_1_by_index - fc_2_by_index) ** 2)))
-    return fft_sample * func(fft_sample)
+    H=np.copy(fft_sample)
+    H = (1-(((H - fc_1_by_index) ** 2) /((fc_1_by_index - fc_2_by_index) ** 2)))
+    H[0:fc_2_by_index] = 0
+    H[fc_1_by_index:] = 1
+
+    return fft_sample*H
 
     pass
 
 
 def bandpass_filter(sample,low_pass=15,high_pass=90,device_hz=200):
-    fft_sample=np.fft(sample)
+    fft_sample=np.fft.fft(sample)
     fft_sample=bp_low_pass(fft_sample,low_pass,device_hz)
     fft_sample=bp_high_pass(fft_sample,high_pass,device_hz)
 
-    return np.ifft(fft_sample)
+    return np.fft.ifft(fft_sample)
 
 def rolling_rms(x, N):
   xc = np.cumsum(abs(x) ** 2);

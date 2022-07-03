@@ -2,8 +2,8 @@
 constSize=False
 #-----------#
 resizeTo=512*3
-path_folder="from_scissors_model_data/"# input
-output_folder="from_scissors_model_data_2d"
+path_folder="all/from_paper_model_data"# input
+output_folder="all_2d_paper"
 channel_from=2
 channel_to=4
 raw_exist=0

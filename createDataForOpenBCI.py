@@ -42,10 +42,13 @@ def loadDataList(dataList,
 
     return X_train, X_valid, y_train, y_valid
 
-
 def BlockData(data,size,i):
     # i = index location , size = how many to block, data = the data to apply on
-    return np.array(data[i:i + size].flatten())
+
+    re_data=data[i:i + size]
+    for j in range(len(re_data)):
+        re_data[j]=re_data[j]-re_data[j][0]
+    return re_data.flatten()
 
 
 def groupData(data,
@@ -130,10 +133,10 @@ def variance(data,size,i):
 
 
 def studyMovement(dataList_classification, sizeOfGroup):#movement [0] no movement[1]
-    filename = 'model_movement.sav'
+    filename = 'model_movement2.sav'
     X_train, X_valid, y_train, y_valid = loadDataList(dataList_classification, sizeOfGroup, variance)
-    if not file_exists(filename):
-        print("creating movement model")
+    if not file_exists(filename) or create_from_base:
+        print("Creating movement model...")
 
 
         depth = 19
@@ -149,9 +152,9 @@ def studyMovement(dataList_classification, sizeOfGroup):#movement [0] no movemen
         clf.fit(X_train, y_train)
         pickle.dump(clf, open(filename, 'wb'))
     else:
-        print("loading movement model\n...")
+        print("Loading movement model...")
         clf = pickle.load(open(filename, 'rb'))
-    print("nmovement detection succeeding rate with RandomForestClassifier:",
+    print("Movement classification succeeding rate with RandomForestClassifier:",
           str(compare(clf.predict(X_valid), y_valid) * 100) + "%")
 
 
@@ -162,11 +165,11 @@ def studyMovement(dataList_classification, sizeOfGroup):#movement [0] no movemen
 import pickle
 from os.path import exists as file_exists
 def studyHandGesture(dataList_movement):
-    filename = 'model_HandGesture.sav'
+    filename = 'model_HandGesture2.sav'
     X_train, X_valid, y_train, y_valid = loadDataList(dataList_movement, 1, BlockData)
 
-    if not file_exists(filename):
-        print("creating hand gesture model")
+    if not file_exists(filename) or create_from_base:
+        print("\nCreating hand gesture model...")
         depth = 11
         estimators = 160
         alpha =0.001
@@ -181,10 +184,10 @@ def studyHandGesture(dataList_movement):
 
         pickle.dump(clf, open(filename, 'wb'))
     else:
-        print("loading hand gesture model")
+        print("\nLoading hand gesture model...")
 
         clf=pickle.load(open(filename, 'rb'))
-    print("\n...\nclassification succeeding rate with RandomForestClassifier:",
+    print("classification succeeding rate with RandomForestClassifier:",
           str(compare(clf.predict(X_valid), y_valid) * 100) + "%")
 
 
@@ -279,16 +282,20 @@ def cleanData():#remove the data from data up to timestamp to avoid files to hea
     lock.release()
     pass
 
-def print_results(type, from_timestamp, to_timestamp, last_type, foldering_by_last):
+def print_results(type, from_timestamp, to_timestamp, last_type, foldering_by_last,samples_done):
     import pandas
+    from tabulate import tabulate
+
     if foldering_by_last:
-        data=[last_type,type,str(from_timestamp),str(to_timestamp)]
-        list_names=["last hand gesture","new hand gesture","first timestamp","sec timestamp"]
+        data=[last_type,type,str(from_timestamp),str(to_timestamp),str(samples_done)]
+        list_names=["Last hand gesture","New hand gesture","Timestamp from","Timestamp to","Total samples recorded"]
 
     else:
-        data=[type,str(from_timestamp),str(to_timestamp)]
-        list_names=["hand gesture","first timestamp","sec timestamp"]
-    pandas.DataFrame(data, list_names, "sample")
+        data=[type,str(from_timestamp),str(to_timestamp),str(samples_done)]
+        list_names=["hand gesture","first timestamp","sec timestamp","Total samples recorded"]
+
+    panda_table=pandas.DataFrame(data, list_names ,[""]).T
+    print(tabulate(panda_table, headers='keys', tablefmt='psql'))
     pass
 
 #------------------------------------------------------------------------------------------------------#
@@ -320,11 +327,11 @@ class OPENBCI(threading.Thread):
 
     def run(self):
         # resolve an EMG stream on the lab network and notify the user
-        print("Looking for an EMG stream...")
+        print("\nLooking for an EMG stream...")
         streams = resolve_stream('type', 'EMG')
         inlet = StreamInlet(streams[0])
         print("EMG stream found!")
-
+        print("Press enter to start")
         file = open("openbci/raw/data.txt", 'a+')
         counter_save=0
         while True:
@@ -345,10 +352,13 @@ class OPENBCI(threading.Thread):
         pass
 
 #---------------------------------------------------------------------------------------#
+create_from_base=False
 
 
-
-
+def create_sample_gesture(livedata_movement):
+    sample=dictToArray(livedata_movement[-1]["hands"][0])
+    sample=sample-sample[0]
+    return sample
 
 
 async def main(uri):
@@ -362,7 +372,7 @@ async def main(uri):
     # ---------------------------------#
     if foldering_by_last:
         last=0
-    last_type="None"
+    last_type="Rock"
     symbol=0
     sizeOfData = 0
     async with connect(uri) as websocket:
@@ -433,7 +443,7 @@ async def main(uri):
         while True:
 
             if thread_data[0]==1:#user on stop
-                print("press enter to start")
+
                 while(thread_data[0]!=0):#wait for user respond
                     msg = await websocket.recv()
                 print("starting...")
@@ -454,9 +464,9 @@ async def main(uri):
                     sizeOfData+=1
 
             if movementDetected(model_Movement,livedata_movement,sizeOfGroup):
-                print("movement DETECTED!!!")
+                print("movement detected.")
                 # print("create time stamp")
-                print(livedata_movement[0]['timestamp'])
+                # print(livedata_movement[0]['timestamp'])
                 from_timestamp=livedata_movement[0]['timestamp']
                 while(movementDetected(model_Movement,livedata_movement,sizeOfGroup)):
                     livedata_movement = []
@@ -472,25 +482,28 @@ async def main(uri):
                         else:
                             livedata_movement.append(sample)
                             sizeOfData += 1
+                to_timestamp = livedata_movement[-1]['timestamp']
+
                 # print("movement stopped!!!")
                 # print("create time stamp")
                 # print(livedata_movement[-1]['timestamp'])
                 # timestamp=getTimestamp
-                to_timestamp = livedata_movement[-1]['timestamp']
-                movementtype=model_Classification.predict(np.array([dictToArray(livedata_movement[-1]["hands"][0])]))
+                sample_gesture=create_sample_gesture(livedata_movement)
+                movementtype=model_Classification.predict(np.array([sample_gesture]))
                 if(movementtype==0):
                     type="rock"
                 if(movementtype==1):
-                    type="pipper"
+                    type="Paper"
                 if(movementtype==2):
-                    type="scissors"
+                    type="Scissors"
                 # print("movement is:",type)# here add list
-                print_results(type,from_timestamp,to_timestamp,last_type,foldering_by_last)
+                counter += 1
+                print_results(type,from_timestamp,to_timestamp,last_type,foldering_by_last,samples_done=counter)
                 import time
                 # wait a bit after movement end to get extra data
                 print("Please wait 5 sec before moving hand.")
                 for i in range(3):
-                    print(5-i)
+                    # print(5-i)
                     time.sleep(1)
                 if foldering_by_last:
                     # print("last movement was:",last_type)
@@ -502,7 +515,6 @@ async def main(uri):
                 # print("cleaning")
                 cleanData()
                 # print("cleaned")
-                counter+=1
                 # print("samples created this run:", counter)
                 if counter==to_leave:
                     exit()

@@ -5,11 +5,11 @@ do_rms=True
 normalize=True
 do_normal_distribution=True
 max_power_file="free_records/for_mvc.txt"# path to MVC sample
-path="from_paper_model_data_2d" # input path
-new_folder="test_understand"# output folder
+path="all_2d_paper" # input pathdsdsd
+new_folder="all_2d_paper_p_3stdto"# output folder
 window_size=50# window for RMS
 std_from_multipli=2#mean - std*multipli... -> start of sample
-std_to_multipli=2#mean + std*multipli... -> end of sample
+std_to_multipli=3#mean + std*multipli... -> end of sample
 rms_before_norm=True
 add_zeros=True
 #----#
