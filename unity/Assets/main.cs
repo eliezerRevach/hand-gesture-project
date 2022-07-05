@@ -87,7 +87,7 @@ public class main : MonoBehaviour
     void Start()
     {
         Debug.Log("test");
-        wssv = new WebSocketServer("ws://127.0.0.1:7891");
+        wssv = new WebSocketServer("ws://127.0.0.1:7891");// create a webscoket to lisen from the live version python file
         wssv.AddWebSocketService<Echo_x>("/x/");
         wssv.AddWebSocketService<Echo_y>("/y/");
         wssv.AddWebSocketService<Echo_z>("/z/");
