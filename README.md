@@ -15,4 +15,7 @@ createDataForLeap.py- simply record leap motion data , put it in folders by clas
 
 randomSplit.py- split to train and test a folder full of csv data with classes , for future deep learning and model testing
 
+folders:
+extracting python code- contain old files of an older project useing the EMG
 learning_EMG folder contain the learning model on the emg data , version 5 is the last, the model that was used for the final result was personal_Net
+
