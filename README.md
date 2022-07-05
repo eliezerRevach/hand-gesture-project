@@ -6,3 +6,5 @@ to2Darray.py-reshape 1d array to 2d array in wanted size + fixed to a  consistan
 JSONViewer.html- simple html file to see leap motion entire data , fingers cords , etc..
 
 data_proccesing.py - hold all the proccesing the system as to offer, some files use it while procceing data 
+
+live_version.py- live version (unity as to be on), deep learning models as to be in folder,  predict movements in live and send it to unity trow websocket to show in 3d
