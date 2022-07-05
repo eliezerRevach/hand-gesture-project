@@ -12,3 +12,5 @@ live_version.py- live version (unity as to be on), deep learning models as to be
 PLOT.py- plot data channels and show them after and before procceing, good only for testing and preview the data proccesing results 
 
 createDataForLeap.py- simply record leap motion data , put it in folders by class
+
+randomSplit.py- split to train and test a folder full of csv data with classes , for future deep learning and model testing
