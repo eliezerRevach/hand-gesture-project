@@ -22,4 +22,5 @@ extracting python code- contain old files of an older project useing the EMG
 
 learning_EMG -  contain the learning model (deep learning) on the emg data , version 5 is the last, the model that was used for the final result was personal_Net and useing a file called indRNN as a part of is learning model
 RNN version 5 architecture:
+
 ![image](https://user-images.githubusercontent.com/51950807/179416977-77d4f362-0cfa-4417-b8ab-b597147c3f5a.png)
