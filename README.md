@@ -1,4 +1,6 @@
 files: 
+createDataForLeap.py- simpley record data from the camera,clean unwanted data ,and save it as files, with the wanted class 
+
 createDataForOpenBci.py - create movement samples made of emg signals, make sure either trained models in folder or camera device samples to learn for creating the model
 
 to2Darray.py-reshape 1d array to 2d array in wanted size + fixed to a  consistant size, good for later proccesing
