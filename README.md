@@ -1,3 +1,7 @@
+![image](https://user-images.githubusercontent.com/51950807/199335380-8748a95b-2942-4402-9145-1d05394388e7.png)
+
+
+
 files: 
 createDataForLeap.py- simpley record data from the camera,clean unwanted data ,and save it as files, with the wanted class 
 
