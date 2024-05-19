@@ -1,7 +1,7 @@
 My project recongize hand gesture (rock paper scissors), using electromyography and Deep learning, by reading signal from mussles elecricy and use ML, im able to predict what movement the hand of the user did, 
 
 https://www.youtube.com/watch?v=wRCOQ3gHxGQ&t=1s
-[![Watch the video](https://i.sstatic.net/Vp2cE.png)]([https://youtu.be/vt5fpE0bzSY](https://www.youtube.com/watch?v=wRCOQ3gHxGQ&t=1s))
+[![Watch the video]([https://i.sstatic.net/Vp2cE.png](https://www.youtube.com/watch?v=wRCOQ3gHxGQ&t=1s))]([https://youtu.be/vt5fpE0bzSY]())
 
 ![image](https://user-images.githubusercontent.com/51950807/199335380-8748a95b-2942-4402-9145-1d05394388e7.png)
 
